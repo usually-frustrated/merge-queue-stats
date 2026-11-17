@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import { readText, remove, writeText } from '../core/storage';
 import { fetchMe, fetchToken, logOut, NotSignedInError, type Account } from '../core/auth';
 
-export type LoginStatus = 'checking' | 'signed_out' | 'signed_in' | 'unavailable';
+export type LoginStatus = 'checking' | 'signed_out' | 'signed_in' | 'unavailable' | 'pasted';
 export type InstallCheck = 'idle' | 'checking' | 'not_found' | 'failed';
 
 export interface AuthState {
@@ -17,6 +18,7 @@ export interface AuthState {
   selectOwner(repoOwner: string | null): void;
   requestToken(): Promise<void>;
   renewRejectedToken(): void;
+  setPastedToken(token: string): void;
   logOut(): Promise<void>;
 }
 
@@ -38,6 +40,9 @@ export const isInstalled = ({ accounts, owner }: Pick<AuthState, 'accounts' | 'o
 export const needsInstall = (state: Pick<AuthState, 'status' | 'accounts' | 'owner'>): boolean =>
   state.status === 'signed_in' && !isInstalled(state);
 
+export const TOKEN_KEY = 'mqs:token';
+const savedToken = readText(TOKEN_KEY);
+
 const RENEW_MARGIN_MS = 5 * 60e3;
 const MIN_RENEW_DELAY_MS = 60e3;
 
@@ -46,14 +51,18 @@ let tokenIssuedAt = 0;
 let renewTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useAuth = create<AuthState>((set, get) => ({
-  status: 'checking',
   ...signedOut,
+  status: savedToken ? 'pasted' : 'checking',
+  token: savedToken,
 
   async checkLogin() {
+    if (get().status === 'pasted') return;
     try {
       const { login, accounts } = await fetchMe();
+      if (get().status === 'pasted') return;
       set({ status: 'signed_in', login, accounts });
     } catch (e) {
+      if (get().status === 'pasted') return;
       set({ status: e instanceof NotSignedInError ? 'signed_out' : 'unavailable', ...signedOut });
     }
   },
@@ -112,12 +121,25 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   renewRejectedToken() {
+    if (get().status !== 'signed_in') return;
     if (Date.now() - tokenIssuedAt >= MIN_RENEW_DELAY_MS) void get().requestToken();
+  },
+
+  setPastedToken(token) {
+    writeText(TOKEN_KEY, token);
+    tokenRun++;
+    clearTimeout(renewTimer);
+    set({ status: 'pasted', ...signedOut, token });
   },
 
   async logOut() {
     tokenRun++;
     clearTimeout(renewTimer);
+    if (get().status === 'pasted') {
+      remove(TOKEN_KEY);
+      set({ status: 'signed_out', ...signedOut });
+      return;
+    }
     set({ token: null, tokenError: null });
     try {
       await logOut();

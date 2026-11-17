@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cacheKey } from '../core/storage';
-import { isInstalled, needsInstall, useAuth } from './auth';
+import { isInstalled, needsInstall, TOKEN_KEY, useAuth } from './auth';
 import { startApp } from './bootstrap';
 import { useData } from './data';
 import { useSettings } from './settings';
@@ -295,6 +295,31 @@ describe('stores', () => {
     await settle();
     expect(useData.getState().authError).toBe(false);
     expect(useData.getState().queueState).toBe('ready');
+  });
+
+  it('loads with a pasted gh token, saves it in localStorage, never asks the login service for a new one, and forgets it', async () => {
+    let denied = false;
+    const { fetch } = stubGitHub((q, u) => (denied ? { status: 401, body: {} } : healthy(q, u)));
+    useSettings.getState().setRepo('acme/widgets', 'main');
+    useAuth.getState().setPastedToken('pasted');
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('pasted');
+    await settle();
+    expect(useAuth.getState().status).toBe('pasted');
+    expect(useData.getState().queueState).toBe('ready');
+
+    denied = true;
+    useData.getState().refreshLive();
+    await settle();
+    expect(useData.getState().authError).toBe(true);
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/token'))).toBe(false);
+    expect(useAuth.getState().token).toBe('pasted');
+
+    const calls = fetch.mock.calls.length;
+    await useAuth.getState().logOut();
+    expect(useAuth.getState().status).toBe('signed_out');
+    expect(useAuth.getState().token).toBeNull();
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(fetch.mock.calls.length).toBe(calls);
   });
 
   it('renews the token before it expires', async () => {
