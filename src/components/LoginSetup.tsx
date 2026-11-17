@@ -1,9 +1,10 @@
 import { CheckCircle } from '@phosphor-icons/react';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { INSTALL_URL, loginUrl } from '../core/auth';
 import { needsInstall, useAuth } from '../stores/auth';
 import { useData } from '../stores/data';
 import { useSettings } from '../stores/settings';
+import { TokenPaste } from './TokenPaste';
 
 function InstallGuide({ className }: { className: string }) {
   const login = useAuth((s) => s.login);
@@ -75,8 +76,11 @@ export function LoginSetup({ compact }: { compact: boolean }) {
   const authError = useData((s) => s.authError);
   const repo = useSettings((s) => s.repo);
   const className = compact ? 'setup setup-compact' : 'setup';
+  const [pasting, setPasting] = useState(false);
 
   if (status === 'checking') return null;
+  if (status === 'pasted' && !authError) return null;
+  const showPaste = pasting || status === 'pasted';
 
   if (status === 'signed_in' && !authError) {
     if (guide) return <InstallGuide className={className} />;
@@ -97,12 +101,21 @@ export function LoginSetup({ compact }: { compact: boolean }) {
       {status === 'unavailable' && (
         <p class="note" role="alert">Could not reach the login service. Reload to try again.</p>
       )}
-      <div>
+      <div class="setup-choices">
         <button type="button" class="bare" onClick={() => location.assign(loginUrl(location.href))}>
           Log in with GitHub
         </button>
+        {!showPaste && (
+          <button type="button" class="bare" onClick={() => setPasting(true)}>
+            Use a gh token instead
+          </button>
+        )}
       </div>
-      <p class="quiet">The GitHub token stays in this page's memory and only goes to api.github.com.</p>
+      {showPaste ? (
+        <TokenPaste />
+      ) : (
+        <p class="quiet">The GitHub token stays in this page's memory and only goes to api.github.com.</p>
+      )}
     </section>
   );
 }

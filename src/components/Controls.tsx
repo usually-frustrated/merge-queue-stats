@@ -79,9 +79,17 @@ export function RepoControls({ derived }: { derived: Derived }) {
 }
 
 export function LogOut() {
-  const signedIn = useAuth((s) => s.status === 'signed_in');
+  const status = useAuth((s) => s.status);
   const logOut = useAuth((s) => s.logOut);
-  if (!signedIn) return null;
+  if (status === 'pasted') {
+    return (
+      <>
+        <span class="quiet" title="Your gh token is saved in this browser's localStorage.">Token saved in this browser</span>
+        <button type="button" class="bare" onClick={() => void logOut()}>Forget token</button>
+      </>
+    );
+  }
+  if (status !== 'signed_in') return null;
   return (
     <button type="button" class="bare" onClick={() => void logOut()}>
       Log out

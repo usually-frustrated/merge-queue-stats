@@ -297,3 +297,10 @@ summary { cursor: pointer; font-size: 15px; font-weight: 600; margin-bottom: 10p
 }
 .combo-list li.current { color: var(--text); font-weight: 600; }
 .combo-list li:hover, .combo-list li[aria-selected="true"] { color: var(--text); background: var(--line-soft); }
+.setup-choices { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.masked { -webkit-text-security: disc; }
+.setup-step { display: flex; flex-direction: column; gap: 6px; }
+.setup-command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 1px 0; border-bottom: 1px solid var(--line); }
+.setup-command code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.setup-command button { display: inline-flex; }
+.setup input { width: 100%; }
